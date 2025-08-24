@@ -106,25 +106,29 @@ public:
         std::destroy_n(data_.GetAddress(), size_);
     }
 
+private:
+    void CopyAssignFrom(const Vector& rhs) {
+        if (rhs.size_ <= data_.Capacity()) {
+            size_t min_size = std::min(size_, rhs.size_);
+            std::copy(rhs.data_.GetAddress(), rhs.data_.GetAddress() + min_size, data_.GetAddress());
+            if (rhs.size_ > size_) {
+                std::uninitialized_copy_n(rhs.data_.GetAddress() + size_, 
+                                         rhs.size_ - size_, 
+                                         data_.GetAddress() + size_);
+            } else if (size_ > rhs.size_) {
+                std::destroy_n(data_.GetAddress() + rhs.size_, size_ - rhs.size_);
+            }
+            size_ = rhs.size_;
+        } else {
+            Vector temp(rhs);
+            Swap(temp);
+        }
+    }
+
+public:
     Vector& operator=(const Vector& rhs) {
         if (this != &rhs) {
-            if (rhs.size_ <= data_.Capacity()) {
-                size_t min_size = std::min(size_, rhs.size_);
-                for (size_t i = 0; i < min_size; ++i) {
-                    data_[i] = rhs.data_[i];
-                }
-                if (rhs.size_ > size_) {
-                    std::uninitialized_copy_n(rhs.data_.GetAddress() + size_, 
-                                             rhs.size_ - size_, 
-                                             data_.GetAddress() + size_);
-                } else if (size_ > rhs.size_) {
-                    std::destroy_n(data_.GetAddress() + rhs.size_, size_ - rhs.size_);
-                }
-                size_ = rhs.size_;
-            } else {
-                Vector temp(rhs);
-                Swap(temp);
-            }
+            CopyAssignFrom(rhs);
         }
         return *this;
     }
@@ -260,6 +264,7 @@ public:
 
     template <typename... Args>
     iterator Emplace(const_iterator pos, Args&&... args) {
+        assert(pos >= begin() && pos <= end());
         size_t insert_pos = pos - begin();
         
         if (size_ == data_.Capacity()) {
@@ -299,14 +304,10 @@ public:
                 T temp_obj(std::forward<Args>(args)...);
                 new (data_.GetAddress() + size_) T(std::move(data_[size_ - 1]));
                 if constexpr (std::is_nothrow_move_assignable_v<T>) {
-                    for (size_t i = size_ - 1; i > insert_pos; --i) {
-                        data_[i] = std::move(data_[i - 1]);
-                    }
+                    std::move_backward(data_.GetAddress() + insert_pos, data_.GetAddress() + size_ - 1, data_.GetAddress() + size_);
                     data_[insert_pos] = std::move(temp_obj);
                 } else {
-                    for (size_t i = size_ - 1; i > insert_pos; --i) {
-                        data_[i] = data_[i - 1];
-                    }
+                    std::copy_backward(data_.GetAddress() + insert_pos, data_.GetAddress() + size_ - 1, data_.GetAddress() + size_);
                     data_[insert_pos] = temp_obj;
                 }
                 ++size_;
@@ -329,16 +330,13 @@ public:
     }
 
     iterator Erase(const_iterator pos) noexcept(std::is_nothrow_move_assignable_v<T>) {
+        assert(pos >= begin() && pos < end());
         size_t erase_pos = pos - begin();
         data_[erase_pos].~T();
         if constexpr (std::is_nothrow_move_assignable_v<T>) {
-            for (size_t i = erase_pos; i < size_ - 1; ++i) {
-                data_[i] = std::move(data_[i + 1]);
-            }
+            std::move(data_.GetAddress() + erase_pos + 1, data_.GetAddress() + size_, data_.GetAddress() + erase_pos);
         } else {
-            for (size_t i = erase_pos; i < size_ - 1; ++i) {
-                data_[i] = data_[i + 1];
-            }
+            std::copy(data_.GetAddress() + erase_pos + 1, data_.GetAddress() + size_, data_.GetAddress() + erase_pos);
         }
         --size_;
         return begin() + erase_pos;
