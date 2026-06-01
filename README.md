@@ -1,5 +1,7 @@
 # C++ Advanced Vector
 
+[![C++ CI](https://github.com/MeedssWW/cpp-advanced-vector/actions/workflows/cpp-ci.yml/badge.svg)](https://github.com/MeedssWW/cpp-advanced-vector/actions/workflows/cpp-ci.yml)
+
 Advanced Vector is a custom implementation of a dynamic array container similar to `std::vector`. The project focuses on manual memory management, object lifetime control, move semantics, exception safety, and iterator support.
 
 ## Features
